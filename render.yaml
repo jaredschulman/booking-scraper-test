@@ -1,9 +1,5 @@
 services:
   - type: cron
     name: booking-scraper-test
-    runtime: python
-    buildCommand: |
-      pip install -r requirements.txt
-      playwright install chromium
-    startCommand: python booking_scraper_test.py
+    runtime: docker
     schedule: "@manual"
