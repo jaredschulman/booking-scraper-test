@@ -79,6 +79,8 @@ async def scrape_booking_data(name, url):
         await browser.close()
 
 async def main():
+    print("📦 Booking Scraper Tester Version 1.2")
+    
     for name, meta in HOSTELS.items():
         url = meta["url_template"].format(checkin=checkin, checkout=checkout)
         await scrape_booking_data(name, url)
