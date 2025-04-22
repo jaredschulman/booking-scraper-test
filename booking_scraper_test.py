@@ -75,9 +75,11 @@ async def scrape_hostel(name, url):
 async def main():
     for name, url in URLS.items():
         try:
-            await scrape_hostel(name, url)
+            await page.goto(url, timeout=30000)
+            await page.wait_for_selector("#hprt-table", timeout=15000)
         except Exception as e:
             print(f"❌ Error scraping {name}: {e}")
+            return None
 
 if __name__ == "__main__":
     asyncio.run(main())
