@@ -1,3 +1,9 @@
-buildCommand: |
-  pip install -r requirements.txt
-  playwright install
+services:
+  - type: cron
+    name: booking-scraper-test
+    runtime: python
+    schedule: "@daily"
+    buildCommand: |
+      pip install -r requirements.txt
+      playwright install
+    startCommand: python booking_scraper_test.py
