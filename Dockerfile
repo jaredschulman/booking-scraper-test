@@ -24,4 +24,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python -m playwright install --with-deps
 
 # Run your script
-CMD ["python", "hostelworld_scraper_playwright.py"]
+CMD ["python", "booking_scraper_test.py"]
