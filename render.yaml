@@ -1,6 +1,5 @@
 services:
-  - type: web
+  - type: cron
     name: booking-scraper-test
-    env: docker
-    plan: starter
-    autoDeploy: false
+    runtime: docker
+    schedule: "@manual"
