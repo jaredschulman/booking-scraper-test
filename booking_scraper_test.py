@@ -82,7 +82,8 @@ with sync_playwright() as p:
         try:
             with context.new_page() as page:
                 page.goto(hostel["url"], timeout=30000)
-                page.wait_for_selector("#hprt-table", timeout=10000)
+                page.wait_for_timeout(3000)
+                page.wait_for_selector("#hprt-table", timeout=30000)
                 html = page.content()
                 result = parse_booking_html(html)
 
