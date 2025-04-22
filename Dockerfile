@@ -13,15 +13,15 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy all project files
+# Copy all files
 COPY . /app
 
-# Upgrade pip and install dependencies
+# Install Python dependencies
 RUN pip install --upgrade pip setuptools
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browser dependencies
-RUN python -m playwright install --with-deps
+# 🔥 Install Playwright browser binaries!
+RUN playwright install --with-deps
 
-# Run your script
+# Default command
 CMD ["python", "booking_scraper_test.py"]
