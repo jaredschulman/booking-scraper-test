@@ -1,95 +1,71 @@
-import asyncio
-from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from datetime import datetime
 
-DORM_KEYWORDS = ["bed in", "dormitory", "shared"]
-PRIVATE_KEYWORDS = ["room", "private"]
+# ----- LOAD HTML -----
+# Replace this with actual HTML loading logic (e.g., Playwright, requests)
+with open("sample_bookingcom_page.html", "r", encoding="utf-8") as f:
+    html = f.read()
 
-def is_dorm(name):
-    return any(k in name.lower() for k in DORM_KEYWORDS)
+# ----- PARSE HTML -----
+soup = BeautifulSoup(html, "html.parser")
+rows = soup.select("tr.js-rt-block-row")
+print(f"Found {len(rows)} room rows\n")
 
-def is_private(name):
-    return any(k in name.lower() for k in PRIVATE_KEYWORDS) and not is_dorm(name)
+# ----- DATA HOLDERS -----
+dorm_beds = 0
+dorm_prices = []
+private_rooms = 0
+private_prices = []
+detailed_lines = []
 
-async def scrape_booking_data(url):
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
-        page = await context.new_page()
-        await page.goto(url, timeout=60000)
+# ----- PARSE EACH ROOM ROW -----
+for row in rows:
+    name_tag = row.select_one("span.hprt-roomtype-icon-link")
+    price_tag = row.select_one("div.bui-price-display__value")
+    select_tag = row.select_one("select.js-hprt-nos-select")
+    cancellation = row.select_one("li.e2e-cancellation")
 
-        await page.wait_for_selector("table#hprt-table")
-        html = await page.content()
-        await browser.close()
-        return parse_booking_html(html)
+    # Skip incomplete rows
+    if not (name_tag and price_tag and select_tag and cancellation):
+        continue
 
-def parse_booking_html(html):
-    soup = BeautifulSoup(html, "html.parser")
-    rows = soup.select("table#hprt-table tr.js-rt-block-row")
-    print(f"\n🔍 Found {len(rows)} rows")
-    print(f"Scraped at: {datetime.now().isoformat()}")
+    room_name = name_tag.get_text(strip=True)
+    price_str = price_tag.get_text(strip=True).replace("$", "").replace(",", "")
+    try:
+        price = float(price_str)
+    except ValueError:
+        continue
 
-    dorm_beds = []
-    private_rooms = []
+    is_dorm = "Bed in" in room_name
+    is_free_cancel = "Free cancellation" in cancellation.get_text()
 
-    for row in rows:
-        name_tag = row.select_one("a.hprt-roomtype-link span")
-        select_tag = row.select_one("select.hprt-nos-select")
-        price_tag = row.select_one("span.prco-valign-middle-helper")
+    # Skip non-refundable rooms
+    if not is_free_cancel:
+        continue
 
-        if not name_tag or not select_tag or not price_tag:
-            continue
+    # Extract max selectable value (available quantity)
+    options = select_tag.find_all("option")
+    available = max([int(opt["value"]) for opt in options if opt.has_attr("value") and opt["value"].isdigit()], default=0)
 
-        # Only keep Free Cancellation rows
-        free_cancel = any(
-            "free cancellation" in tag.get_text(strip=True).lower()
-            for tag in row.select("li.e2e-cancellation, li[data-testid='cancellation-subtitle']")
-        )
-        if not free_cancel:
-            continue
+    # Add to summary stats
+    if is_dorm:
+        dorm_beds += available
+        dorm_prices.extend([price] * available)
+    else:
+        private_rooms += available
+        private_prices.extend([price] * available)
 
-        name = name_tag.get_text(strip=True)
+    # Add to detailed log
+    detailed_lines.append(f"{room_name} | ${price:.2f} | {available} available")
 
-        try:
-            price = float(price_tag.get_text(strip=True).replace("$", "").replace(",", ""))
-        except ValueError:
-            continue
+# ----- SUMMARY OUTPUT -----
+print("🛏️ Dorm beds available:", dorm_beds)
+print("💸 Avg dorm bed price:", f"${sum(dorm_prices)/len(dorm_prices):.2f}" if dorm_prices else "N/A")
+print("🏠 Private rooms available:", private_rooms)
+print("💰 Avg private room price:", f"${sum(private_prices)/len(private_prices):.2f}" if private_prices else "N/A")
+print()
 
-        options = select_tag.find_all("option")
-        quantity = len(options) - 1  # Exclude option 0
-
-        if quantity == 0:
-            continue
-
-        print(f"{name} | ${price:.2f} | {quantity} available")
-
-        if is_dorm(name):
-            beds_per_room = 1
-            if "4-bed" in name.lower():
-                beds_per_room = 4
-            elif "6-bed" in name.lower():
-                beds_per_room = 6
-            elif "8-bed" in name.lower():
-                beds_per_room = 8
-            elif "10-bed" in name.lower():
-                beds_per_room = 10
-            elif "12-bed" in name.lower():
-                beds_per_room = 12
-
-            total_beds = beds_per_room * quantity
-            dorm_beds += [price] * total_beds
-        elif is_private(name):
-            private_rooms += [price] * quantity
-
-    print(f"\n🛏️ Dorm beds available: {len(dorm_beds)}")
-    print(f"💸 Avg dorm bed price: ${sum(dorm_beds)/len(dorm_beds):.2f}" if dorm_beds else "💸 Avg dorm bed price: N/A")
-    print(f"🏠 Private rooms available: {len(private_rooms)}")
-    print(f"💰 Avg private room price: ${sum(private_rooms)/len(private_rooms):.2f}" if private_rooms else "💰 Avg private room price: N/A")
-
-# -----------------------------
-# 🔍 Example test run
-# -----------------------------
-if __name__ == "__main__":
-    test_url = "https://www.booking.com/hotel/us/i-street-hostel.en-gb.html?checkin=2025-04-27&checkout=2025-04-28&group_adults=1"
-    asyncio.run(scrape_booking_data(test_url))
+# ----- DETAILED OUTPUT -----
+print("Scraped at:", datetime.now().isoformat())
+for line in detailed_lines:
+    print(line)
